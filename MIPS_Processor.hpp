@@ -60,6 +60,7 @@ struct RR{
 	int reg1_value;
 	int reg2_value;
 	int reg3_value;
+	std::string label;
 	std::string location;
 	//bool load_store;
 };
@@ -74,6 +75,8 @@ struct EX{
 	bool branch_satisfied;
 	int load_or_store_mem_address;
 	bool branch_instruction;
+	int label_address;
+	bool jump;
 };
 struct MEM{
 	std::string dest_register;
@@ -143,7 +146,7 @@ struct MIPS_Architecture
 	{
 		instructions = {{"add", &MIPS_Architecture::add}, {"sub", &MIPS_Architecture::sub}, {"mul", &MIPS_Architecture::mul}, {"beq", &MIPS_Architecture::beq}, {"bne", &MIPS_Architecture::bne}, {"slt", &MIPS_Architecture::slt}, {"j", &MIPS_Architecture::j}, {"lw", &MIPS_Architecture::lw}, {"sw", &MIPS_Architecture::sw}, {"addi", &MIPS_Architecture::addi}};
 		instructions_decode = {{"add", &MIPS_Architecture::decode_add}, {"sub", &MIPS_Architecture::decode_sub}, {"mul", &MIPS_Architecture::decode_mul}, {"beq", &MIPS_Architecture::decode_beq}, {"bne", &MIPS_Architecture::decode_bne}, {"slt", &MIPS_Architecture::decode_slt}, {"j", &MIPS_Architecture::decode_j}, {"lw", &MIPS_Architecture::decode_lw}, {"sw", &MIPS_Architecture::decode_sw}, {"addi", &MIPS_Architecture::decode_addi}};
-		instructions_execute ={{"add", &MIPS_Architecture::alu_add}, {"sub", &MIPS_Architecture::alu_sub}, {"mul", &MIPS_Architecture::alu_mul}, {"beq", &MIPS_Architecture::alu_beq}, {"bne", &MIPS_Architecture::alu_bne}, {"slt", &MIPS_Architecture::alu_slt}, {"lw", &MIPS_Architecture::alu_lw}, {"sw", &MIPS_Architecture::alu_sw}, {"addi", &MIPS_Architecture::alu_addi}};
+		instructions_execute ={{"add", &MIPS_Architecture::alu_add}, {"sub", &MIPS_Architecture::alu_sub}, {"mul", &MIPS_Architecture::alu_mul}, {"beq", &MIPS_Architecture::alu_beq}, {"bne", &MIPS_Architecture::alu_bne}, {"slt", &MIPS_Architecture::alu_slt}, {"lw", &MIPS_Architecture::alu_lw}, {"sw", &MIPS_Architecture::alu_sw}, {"addi", &MIPS_Architecture::alu_addi},{"j", &MIPS_Architecture::alu_j}};
 
 		for (int i = 0; i < 32; ++i)
 			registerMap["$" + std::to_string(i)] = i;
@@ -397,7 +400,6 @@ struct MIPS_Architecture
 		return 0;
 	}
 	int alu_beq(std::string dest_regs,int a,int b){
-		_EX_latch.data = a-b;
 		_EX_latch.reg_write = false;
 		_EX_latch.mem_read =false;
 		_EX_latch.mem_write =false;
@@ -454,6 +456,12 @@ struct MIPS_Architecture
 		_EX_latch.zero_output = false;
 		_EX_latch.branch_instruction = false;
 
+		return 0;
+	}
+
+	int alu_j(std::string data ="",int a =0, int b =0){
+		_EX_latch.label_address = address[_RR_latch.label];
+		_EX_latch.jump = true;
 		return 0;
 	}
 	// perform add operation
@@ -789,87 +797,94 @@ struct MIPS_Architecture
 		handleExit(SUCCESS, clockCycles);
 	}
 
-
-	//My implementation of Pipelined Registers
-	void executePipelined(int Question_no){
-		if (commands.size() >= MAX / 4)
-		{
-			handleExit(MEMORY_ERROR, 0);
-			return;
-		}
-		int clockCycles =0;
-		while(true){
-			++clockCycles;
-			std::vector<std::string> &command = commands[PCcurr];
-
-
-		}
-		handleExit(SUCCESS, clockCycles);
-	}
 //Stages of ALU Execution
 
 //Instruction fetch
-	int IF_Stage1(bool IF_Control,int Program_Counter,int clockCycles){
-		if(IF_Control == false){
+	int IF_Stage1(int Program_Counter,int clockCycles){
+		if(pipeline_controls.IF_Stage_1 ==false){
 			return 0;
 		}
 		if(pipeline_controls.IF_Stage_2 == true){
-			std::cout<<"Stalling : "<< clockCycles<<std::endl;
+			std::cout<<"Stalling : IF1 "<< clockCycles<<std::endl;
+			return 0;
+		}
+		if(Program_Counter <commands.size()){
+			_IF1_latch.command = commands[Program_Counter];
+			pipeline_controls.IF_Stage_2 = true;
+		}
+		
+
+		return 0;
+	}
+
+	//Stage 2
+	int IF_Stage2(int clockCycles){
+		if(pipeline_controls.IF_Stage_2 == false){
+			return 0;
+		}
+		if(pipeline_controls.ID_Stage_1 == true){
+			std::cout<<"Stalling : IF2"<< clockCycles<<std::endl;
 			return 0;
 		}
 		
-		_IF1_latch.command = commands[Program_Counter];
-		_IF1_latch.PC_value = Program_Counter;
-		return 0;
-	}
-	int IF_Stage2(bool IF_Control,bool stall,int clockCycles){
-		if(IF_Control == false){
-			return 0;
-		}
-		if(stall == true){
-			std::cout<<"Stalling: IF Stage 2"<<std::endl;
-		}else{
-			_IF2_latch.command = _IF1_latch.command;
-			PCcurr = _IF1_latch.PC_value + 	1;
-		}
+		_IF2_latch.command = _IF1_latch.command;
+		pipeline_controls.IF_Stage_2 = false;
+		pipeline_controls.ID_Stage_1 = true;
 		return 0;
 	}
 //Instruction Decode
-	int ID_Stage1(bool ID_Control,bool stall,std::vector<std::string> &command,int clockCycles){
-		if(ID_Control ==false){
+	int ID_Stage1(std::vector<std::string> &command,int clockCycles){
+
+		if(pipeline_controls.ID_Stage_1 ==false){
 			return 0;
 		}
-		if(stall ==true){
-			std::cout<<"Stalling: ID Stage 1 "<<std::endl;
-			return 0;
-		}else{
-			if (instructions.find(command[0]) == instructions.end())
+		if(pipeline_controls.ID_Stage_2){
+			std::cout<<"Stalling : ID1"<< clockCycles<<std::endl;
+			return 0;			
+		}
+		if (instructions.find(command[0]) == instructions.end())
 			{
 				handleExit(SYNTAX_ERROR, clockCycles);
 				return 4;
 			}
 			//latch->operation= command[0];
-			exit_code ret = (exit_code)instructions_decode[_IF2_latch.command[0]](*this,false,_IF2_latch.command[1],_IF2_latch.command[2],_IF2_latch.command[3]);
-			_ID1_latch.op = _IF2_latch.command[0];
-		}
+		exit_code ret = (exit_code)instructions_decode[_IF2_latch.command[0]](*this,false,_IF2_latch.command[1],_IF2_latch.command[2],_IF2_latch.command[3]);
+		_ID1_latch.op = _IF2_latch.command[0];
+		pipeline_controls.ID_Stage_1 = false;
+		pipeline_controls.ID_Stage_2 = true;
+
+
 		return 0;
 	}
-	int ID_Stage2(bool ID_Control,bool stall){
-		if(ID_Control ==false){
+	int ID_Stage2(int clockCycles){
+		if(pipeline_controls.ID_Stage_2 ==false){
 			return 0;
 		}
-		if(ID_Control ==false){
-			std::cout<<"Stalling: ID Stage 2 "<<std::endl;
-			return 0;
-		}else{
-			_ID2_latch = _ID1_latch;
-
+		if(pipeline_controls.RR_){
+			std::cout<<"Stalling : ID2"<< clockCycles<<std::endl;
+			return 0;			
 		}
-		return;
+		_ID2_latch = _ID1_latch;
+		pipeline_controls.ID_Stage_2 = false;
+		pipeline_controls.RR_ = true;
+		return 0;
 	}
 
-	void RR(bool RR_Control){
-		if(_ID2_latch.alu_operation && !_ID2_latch.branch_instruction && _ID2_latch._stages7){
+	int RR(int clockCycles){
+		if(pipeline_controls.RR_ ==false){
+			return 0;
+		}
+		if(pipeline_controls.ALU_Stage_){
+			std::cout<<"Stalling : RR"<< clockCycles<<std::endl;
+			return 0;						
+		}
+		if(_ID2_latch.operation == j_){
+			_RR_latch.operation = j_;
+			_RR_latch.op = _ID2_latch.op;
+			_RR_latch.label = _ID2_latch.label;
+			_RR_latch._stage7 = true;
+			_RR_latch.destination_register = _ID2_latch.label;
+		}else if(!_ID2_latch.branch_instruction && _ID2_latch._stages7){
 			_RR_latch.op  = _ID2_latch.op;
 			_RR_latch.alu_operation = true;
 			_RR_latch.branch_instruction = false;
@@ -882,7 +897,8 @@ struct MIPS_Architecture
 				_RR_latch.reg3_value = _ID2_latch.immediate;
 			}
 
-		}else if(_ID2_latch.alu_operation && _ID2_latch.branch_instruction){
+		}else if(_ID2_latch.branch_instruction){
+			_RR_latch.label = _ID2_latch.label;
 			_RR_latch.alu_operation = true;
 			_RR_latch.op  = _ID2_latch.op;
 			_RR_latch.branch_instruction = true;
@@ -891,7 +907,7 @@ struct MIPS_Architecture
 			_RR_latch.reg2_value = registers[registerMap[_ID2_latch.register_r2]];
 			_RR_latch.reg3_value = registers[registerMap[_ID2_latch.register_r3]];
 
-		}else if(_ID2_latch.alu_operation == lw_ || sw_){
+		}else if(_ID2_latch.operation == lw_ || sw_){
 			_RR_latch.alu_operation = true;
 			_RR_latch.branch_instruction = false;
 			_RR_latch._stage7 =false;
@@ -904,17 +920,48 @@ struct MIPS_Architecture
 				_RR_latch.reg1_value = registers[registerMap[_ID2_latch.register_r1]];
 			}
 		}
-		return;
+		pipeline_controls.ALU_Stage_ =true;
+		pipeline_controls.RR_ = false;
+		return 0;
 	}
 //ALU Stage
-	int ALU_Stage(bool ALU_Control){
-		exit_code ret = (exit_code)instructions_execute[_RR_latch.op](*this,_RR_latch.destination_register,_RR_latch.reg2_value,_RR_latch.reg3_value);
+	int ALU_Stage(int clockCycles){
+		if(!pipeline_controls.ALU_Stage_){
+			return 0;
+		}
+		if(_RR_latch._stage7){
+			if(pipeline_controls.WB_1){
+			std::cout<<"Stalling : alu"<< clockCycles<<std::endl;
+			return 0;
+			}else{
+				exit_code ret = (exit_code)instructions_execute[_RR_latch.op](*this,_RR_latch.destination_register,_RR_latch.reg2_value,_RR_latch.reg3_value);
+				pipeline_controls.stage_7 =true;
+				pipeline_controls.WB_1 =true;
+				pipeline_controls.ALU_Stage_ =false;
+			}
+		}else{
+			if(pipeline_controls.MEM_Stage_1){
+				std::cout<<"Stalling : alu"<< clockCycles<<std::endl;
+				return 0;
+			}else{
+				exit_code ret = (exit_code)instructions_execute[_RR_latch.op](*this,_RR_latch.destination_register,_RR_latch.reg2_value,_RR_latch.reg3_value);
+				pipeline_controls.ALU_Stage_ = false;
+				pipeline_controls.MEM_Stage_1 = true;
+			}
+		}
 	return 0;
 	}
 
 
 //MEM Stage
-	int  MEM_stage1(bool Mem_Control){
+	int  MEM_stage1(int clockCycles){
+		if(!pipeline_controls.MEM_Stage_1){
+			return 0;
+		}
+		if(pipeline_controls.MEM_Stage_2){
+			std::cout<<"Stalling : MEM_Stage1"<< clockCycles<<std::endl;
+			return 0;			
+		}
 		_MEM_latch.reg_write =_EX_latch.reg_write;
 		_MEM_latch.dest_register = _EX_latch.dest_register;
 		if(_EX_latch.mem_read){
@@ -922,25 +969,52 @@ struct MIPS_Architecture
 		}else if(_EX_latch.mem_write){
 			data[_EX_latch.load_or_store_mem_address] = _EX_latch.data;
 		}
+		pipeline_controls.MEM_Stage_1 = false;
+		pipeline_controls.MEM_Stage_2 = true;
 		return 0;
 	}
 
-	int MEM_Stage2(bool MEM_Control){
+	int MEM_Stage2(int clockCycles){
+		if(pipeline_controls.MEM_Stage_2 ==false){
+			return 0;
+		}
+		if(pipeline_controls.WB_1){
+			std::cout<<"Stalling : alu"<< clockCycles<<std::endl;
+			return 0;
+		}
+
+		pipeline_controls.stage_9 = true;
 		_MEM2_latch = _MEM_latch;
+		pipeline_controls.MEM_Stage_2 = false;
+		pipeline_controls.WB_1 = true;
 	}
 // Writeback
-	int WB(bool WB_Control,bool stage_7,bool stage_9){
-		if(stage_7 && stage_9 || stage_9){
-			stage_9 = false;
+	int WB(int clockCycles){
+		if(pipeline_controls.WB_1==false){
+			PCcurr= PCcurr+1;
+			return 0;
+		}
+
+		if(pipeline_controls.stage_9 == true){
+			pipeline_controls.stage_9 = false;
 			if(_MEM2_latch.reg_write){
 				registers[registerMap[_MEM2_latch.dest_register]] = _MEM2_latch.data;
 			}
-		}else if(stage_7){
-			stage_7 = false;
-			if(_MEM2_latch.reg_write){
+			pipeline_controls.WB_1 = true;
+		}else if(pipeline_controls.stage_7){
+			pipeline_controls.stage_7 = false;
+			if(_EX_latch.jump){
+				PCcurr = _EX_latch.label_address;
+				return 0;
+			}else if(_EX_latch.branch_instruction ==true && _EX_latch.branch_satisfied ==true){
+				PCcurr = _EX_latch.label_address;
+				return 0;
+			}else if(_MEM2_latch.reg_write){
 				registers[registerMap[_MEM2_latch.dest_register]] = _MEM2_latch.data;
 			}
 		}
+		PCcurr = PCcurr+1;
+		return 0;
 		
 	}
 
@@ -964,21 +1038,26 @@ struct MIPS_Architecture
 		}
 
 		int clockCycles = 0;
+		int count =0;
 		while(true){
 			++clockCycles;
-			if(PCcurr !=commands.size()){
-				std::vector<std::string> &command = commands[PCcurr];
+			if(PCcurr >= commands.size()){
+				count ++;
 			}
-			WB(true,true,true);
-			MEM_Stage2(true);
-			MEM_stage1(true);
-			ALU_Stage(true);
-			RR(true);
-			ID_Stage2(true,true);
-			ID_Stage1(true,true,_IF2_latch.command,clockCycles);
-			IF_Stage2(true,true,clockCycles);
-			IF_Stage1(true,PCcurr,clockCycles);
+			
+			WB(clockCycles);
+			MEM_Stage2(clockCycles);
+			MEM_stage1(clockCycles);
+			ALU_Stage(clockCycles);
+			RR(clockCycles);
+			ID_Stage2(clockCycles);
+			ID_Stage1(_IF2_latch.command,clockCycles);
+			IF_Stage2(clockCycles);
+			IF_Stage1(PCcurr,clockCycles);
 			printRegisters(clockCycles);
+			if(count == 8){
+				break;
+			}
 
 		}
 
