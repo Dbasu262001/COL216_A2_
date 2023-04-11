@@ -31,6 +31,7 @@ struct IF{
 	std::vector< std::string> command; 
 };
 struct ID{
+	std::string op;
 	int operation;
 	bool _stages7;
 	bool alu_operation;
@@ -44,22 +45,41 @@ struct ID{
 	int reg1_value;
 	int reg2_value;
 	int reg3_value;
+	//bool load_store;
 };
+struct RR{
+	bool alu_operation;
+	std::string op;
+	int operation;
+	bool _stage7;
+	bool branch_instruction;
+	std::string destination_register;
+	int reg1_value;
+	int reg2_value;
+	int reg3_value;
+	std::string location;
+	//bool load_store;
+};
+
 struct EX{
 	std::string dest_register;
-	std::string data;
+	int data;
 	bool zero_output;
-	bool write_back;
-	bool MEM;
-
+	bool reg_write;
+	bool mem_write;
+	bool mem_read;
+	bool branch_satisfied;
+	int load_or_store_mem_address;
+	bool branch_instruction;
 };
 struct MEM{
+	std::string dest_register;
+	bool reg_write;
+	bool branch_satisfied;
+	int data;
 
 };
 struct WB{
-
-};
-struct RR{
 
 };
 
@@ -70,7 +90,7 @@ struct MIPS_Architecture
 	std::unordered_map<std::string, std::function<int(MIPS_Architecture &, std::string, std::string, std::string)>> instructions;
 	std::unordered_map<std::string, std::function<int(MIPS_Architecture &, std::string, std::string, std::string)>> instructions_pipeline;
 	std::unordered_map<std::string, std::function<int(MIPS_Architecture &,bool,std::string, std::string, std::string)>> instructions_decode;
-	std::unordered_map<std::string, std::function<int(MIPS_Architecture &, std::string, std::string, std::string)>> instructions_execute;
+	std::unordered_map<std::string, std::function<int(MIPS_Architecture &, std::string, int, int)>> instructions_execute;
 
 	std::unordered_map<std::string, int> registerMap, address;
 	static const int MAX = (1 << 20);
@@ -121,7 +141,7 @@ struct MIPS_Architecture
 	{
 		instructions = {{"add", &MIPS_Architecture::add}, {"sub", &MIPS_Architecture::sub}, {"mul", &MIPS_Architecture::mul}, {"beq", &MIPS_Architecture::beq}, {"bne", &MIPS_Architecture::bne}, {"slt", &MIPS_Architecture::slt}, {"j", &MIPS_Architecture::j}, {"lw", &MIPS_Architecture::lw}, {"sw", &MIPS_Architecture::sw}, {"addi", &MIPS_Architecture::addi}};
 		instructions_decode = {{"add", &MIPS_Architecture::decode_add}, {"sub", &MIPS_Architecture::decode_sub}, {"mul", &MIPS_Architecture::decode_mul}, {"beq", &MIPS_Architecture::decode_beq}, {"bne", &MIPS_Architecture::decode_bne}, {"slt", &MIPS_Architecture::decode_slt}, {"j", &MIPS_Architecture::decode_j}, {"lw", &MIPS_Architecture::decode_lw}, {"sw", &MIPS_Architecture::decode_sw}, {"addi", &MIPS_Architecture::decode_addi}};
-		instructions_execute ={{"add", &MIPS_Architecture::add}, {"sub", &MIPS_Architecture::sub}, {"mul", &MIPS_Architecture::mul}, {"beq", &MIPS_Architecture::beq}, {"bne", &MIPS_Architecture::bne}, {"slt", &MIPS_Architecture::slt}, {"j", &MIPS_Architecture::j}, {"lw", &MIPS_Architecture::lw}, {"sw", &MIPS_Architecture::sw}, {"addi", &MIPS_Architecture::addi}};
+		instructions_execute ={{"add", &MIPS_Architecture::alu_add}, {"sub", &MIPS_Architecture::alu_sub}, {"mul", &MIPS_Architecture::alu_mul}, {"beq", &MIPS_Architecture::alu_beq}, {"bne", &MIPS_Architecture::alu_bne}, {"slt", &MIPS_Architecture::alu_slt}, {"lw", &MIPS_Architecture::alu_lw}, {"sw", &MIPS_Architecture::alu_sw}, {"addi", &MIPS_Architecture::alu_addi}};
 
 		for (int i = 0; i < 32; ++i)
 			registerMap["$" + std::to_string(i)] = i;
@@ -151,6 +171,7 @@ struct MIPS_Architecture
 			return 1;
 		_ID1_latch.alu_operation =true;
 		_ID1_latch.operation = addition;
+		_ID1_latch._stages7 = true;
 		_ID1_latch.register_r1 = r1;
 		_ID1_latch.register_r2 = r2;
 		_ID1_latch.register_r3 = r3;
@@ -166,6 +187,7 @@ struct MIPS_Architecture
 			return 1;
 		_ID1_latch.alu_operation =true;
 		_ID1_latch.operation = substraction;
+		_ID1_latch._stages7 = true;
 		_ID1_latch.register_r1 = r1;
 		_ID1_latch.register_r2 = r2;
 		_ID1_latch.register_r3 = r3;
@@ -183,6 +205,7 @@ struct MIPS_Architecture
 		_ID1_latch.operation = multiplication;
 		_ID1_latch.register_r1 = r1;
 		_ID1_latch.register_r2 = r2;
+		_ID1_latch._stages7 = true;
 		_ID1_latch.register_r3 = r3;
 		_ID1_latch.branch_instruction = false;
 		if(decode_read){
@@ -200,9 +223,10 @@ struct MIPS_Architecture
 			return 1;
 		_ID1_latch.alu_operation = true;
 		_ID1_latch.operation = beq_;
+		_ID1_latch._stages7 = true;
 		_ID1_latch.branch_instruction = true;
-		_ID1_latch.register_r1 = r1;
-		_ID1_latch.register_r2 = r2;
+		_ID1_latch.register_r2 = r1;
+		_ID1_latch.register_r3 = r2;
 		_ID1_latch.label = label;
 		_ID1_latch.branch_condition =0;
 		if(decode_read){
@@ -219,8 +243,9 @@ struct MIPS_Architecture
 		_ID1_latch.alu_operation = true;
 		_ID1_latch.operation= bne_;
 		_ID1_latch.branch_instruction = true;
-		_ID1_latch.register_r1 = r1;
-		_ID1_latch.register_r2 = r2;
+		_ID1_latch.register_r2 = r1;
+		_ID1_latch._stages7 = true;
+		_ID1_latch.register_r3 = r2;
 		_ID1_latch.label = label;
 		_ID1_latch.branch_condition =1;
 		if(decode_read){
@@ -234,6 +259,7 @@ struct MIPS_Architecture
 		_ID1_latch.operation = slt_;
 		_ID1_latch.branch_instruction = false;
 		_ID1_latch.register_r1 = r1;
+		_ID1_latch._stages7 = true;
 		_ID1_latch.register_r2 = r2;
 		_ID1_latch.register_r3 = r3;
 		_ID1_latch.branch_condition =-1;
@@ -250,6 +276,7 @@ struct MIPS_Architecture
 			return 2;
 		_ID1_latch.alu_operation = false;
 		_ID1_latch.operation = j_;
+		_ID1_latch._stages7 = true;
 		_ID1_latch.branch_instruction = false;
 		_ID1_latch.label = label;
 		_ID1_latch.branch_condition =-1;
@@ -262,12 +289,10 @@ struct MIPS_Architecture
 	int decode_lw(bool decode_read,std::string r, std::string location,std::string unused2 =""){
 		if (!checkRegister(r) || registerMap[r] == 0)
 			return 1;
-		int address = locateAddress(location);
-		if (address < 0)
-			return abs(address);
 		if(decode_read){
 			return 0;
 		}
+		_ID1_latch._stages7 = false;
 		_ID1_latch.alu_operation =true;
 		_ID1_latch.operation = lw_;
 		_ID1_latch.branch_instruction = false;
@@ -283,12 +308,10 @@ struct MIPS_Architecture
 	int decode_sw(bool decode_read,std::string r,std::string location,std::string unused2 =""){
 		if (!checkRegister(r) || registerMap[r] == 0)
 			return 1;
-		int address = locateAddress(location);
-		if (address < 0)
-			return abs(address);
 		if(decode_read){
 			return 0;
 		}
+		_ID1_latch._stages7 = false;
 		_ID1_latch.alu_operation =true;
 		_ID1_latch.operation = sw_;
 		_ID1_latch.branch_instruction = false;
@@ -307,7 +330,8 @@ struct MIPS_Architecture
 		if (!checkRegisters({r1, r2}) || registerMap[r1] == 0)
 			return 1;
 		_ID1_latch.alu_operation =true;
-		_ID1_latch.operation = sw_;
+		_ID1_latch.operation = addimmediate;
+		_ID1_latch._stages7 = true;
 		_ID1_latch.branch_instruction = false;
 		_ID1_latch.register_r1 = r1;
 		_ID1_latch.register_r2 = r2; 
@@ -320,7 +344,116 @@ struct MIPS_Architecture
 		
 	}
 
+//ALU STAGE IMPLEMENTATION
+	int alu_add(std::string dest_regs,int a,int b){
+		_EX_latch.data = a+b;
+		_EX_latch.reg_write = true;
+		_EX_latch.mem_read =false;
+		_EX_latch.mem_write =false;
+		_EX_latch.dest_register = dest_regs;
+		_EX_latch.zero_output = false;
+		_EX_latch.branch_instruction = false;
+		return 0;
+	}
 
+	int alu_sub(std::string dest_regs,int a,int b){
+		_EX_latch.data = a-b;
+		_EX_latch.reg_write = true;
+		_EX_latch.mem_read =false;
+		_EX_latch.mem_write =false;
+		_EX_latch.dest_register = dest_regs;
+		_EX_latch.zero_output = false;
+		_EX_latch.branch_instruction = false;
+
+		return 0;
+	}
+	int alu_mul(std::string dest_regs,int a,int b){
+		_EX_latch.data = a*b;
+		_EX_latch.reg_write = true;
+		_EX_latch.mem_read =false;
+		_EX_latch.mem_write =false;
+		_EX_latch.dest_register = dest_regs;
+
+		_EX_latch.zero_output = false;
+		_EX_latch.branch_instruction = false;
+
+		return 0;
+	}
+	int alu_bne(std::string dest_regs,int a,int b){
+		_EX_latch.data = a-b;
+		_EX_latch.reg_write = false;
+		_EX_latch.mem_read =false;
+		_EX_latch.mem_write =false;
+		_EX_latch.dest_register = dest_regs;
+		if(a !=b){
+			_EX_latch.branch_satisfied = true; 
+		}else{
+			_EX_latch.branch_satisfied = false; 
+		}
+		_EX_latch.branch_instruction = true;
+
+		return 0;
+	}
+	int alu_beq(std::string dest_regs,int a,int b){
+		_EX_latch.data = a-b;
+		_EX_latch.reg_write = false;
+		_EX_latch.mem_read =false;
+		_EX_latch.mem_write =false;
+		_EX_latch.dest_register = dest_regs;
+		if(a ==b){
+			_EX_latch.branch_satisfied = true; 
+		}else{
+			_EX_latch.branch_satisfied = false; 
+		}
+		_EX_latch.branch_instruction = true;
+		return 0;
+	}
+	int alu_slt(std::string dest_regs,int a,int b){
+		_EX_latch.data = a < b;
+		_EX_latch.reg_write = true;
+		_EX_latch.mem_read =false;
+		_EX_latch.mem_write =false;
+		_EX_latch.dest_register = dest_regs;
+		_EX_latch.branch_satisfied = false; 
+		_EX_latch.branch_instruction = false;
+
+		return 0;
+	}
+	int alu_addi(std::string dest_regs,int a,int b){
+		_EX_latch.data = a+b;
+		_EX_latch.reg_write = true;
+		_EX_latch.mem_read =false;
+		_EX_latch.mem_write =false;
+		_EX_latch.dest_register = dest_regs;
+		_EX_latch.zero_output = false;
+		_EX_latch.branch_satisfied = false; 
+		_EX_latch.branch_instruction = false;
+
+		return 0;
+	}
+	int alu_lw(std::string dest_regs,int a =0,int b =10){
+		_EX_latch.mem_read = true;
+		_EX_latch.mem_write = false;
+		_EX_latch.reg_write = true;
+		_EX_latch.dest_register = dest_regs;
+		_EX_latch.load_or_store_mem_address = locateAddress(_RR_latch.location);
+		_EX_latch.zero_output = false;
+		_EX_latch.branch_instruction = false;
+
+		return 0;
+	}
+
+	int alu_sw(std::string data,int address=0,int b =10){
+		_EX_latch.mem_read = false;
+		_EX_latch.reg_write = false;
+		_EX_latch.data = _RR_latch.reg1_value;
+		_EX_latch.mem_write = true;
+		_EX_latch.load_or_store_mem_address = locateAddress(_RR_latch.location);
+		_EX_latch.zero_output = false;
+		_EX_latch.branch_instruction = false;
+
+		return 0;
+	}
 	// perform add operation
 	int add(std::string r1, std::string r2, std::string r3)
 	{
@@ -674,26 +807,27 @@ struct MIPS_Architecture
 //Stages of ALU Execution
 
 //Instruction fetch
-	int IF_Stage1(bool IF_Control,bool stall,int Program_Counter,int clockCycles,std::vector<std::string> &command){
+	int IF_Stage1(bool IF_Control,bool stall,int Program_Counter,int clockCycles){
 		if(IF_Control == false){
 			return 0;
 		}
 		if(stall ==false){
 			std::cout<<"Stalling: IF Stage 1"<<std::endl;
 		}else{
-			command = commands[Program_Counter];
+			_IF1_latch.command = commands[Program_Counter];
+			_IF1_latch.PC_value = Program_Counter;
 		}
 		return 0;
 	}
-	int IF_Stage2(bool IF_Control,bool stall,int &Program_Counter,int clockCycles,std::vector<std::string> &command){
+	int IF_Stage2(bool IF_Control,bool stall,int clockCycles,std::vector<std::string> &command){
 		if(IF_Control == false){
 			return 0;
 		}
 		if(stall == true){
 			std::cout<<"Stalling: IF Stage 2"<<std::endl;
 		}else{
-			
-			Program_Counter++;
+			_IF2_latch.command = _IF1_latch.command;
+			PCcurr = _IF1_latch.PC_value + 	1;
 		}
 		return 0;
 	}
@@ -712,9 +846,10 @@ struct MIPS_Architecture
 				return 4;
 			}
 			//latch->operation= command[0];
-
+			exit_code ret = (exit_code)instructions_decode[_IF2_latch.command[0]](*this,false,_IF2_latch.command[1],_IF2_latch.command[2],_IF2_latch.command[3]);
+			_ID1_latch.op = _IF2_latch.command[0];
 		}
-		return;
+		return 0;
 	}
 	int ID_Stage2(bool ID_Control,bool stall){
 		if(ID_Control ==false){
@@ -724,24 +859,65 @@ struct MIPS_Architecture
 			std::cout<<"Stalling: ID Stage 2 "<<std::endl;
 			return 0;
 		}else{
-			
+			_ID2_latch = _ID1_latch;
+
 		}
 		return;
 	}
 
 	void RR(bool RR_Control){
+		if(_ID2_latch.alu_operation && !_ID2_latch.branch_instruction && _ID2_latch._stages7){
+			_RR_latch.op  = _ID2_latch.op;
+			_RR_latch.alu_operation = true;
+			_RR_latch.branch_instruction = false;
+			_RR_latch._stage7 =true;
+			_RR_latch.destination_register = _ID2_latch.register_r1;
+			_RR_latch.reg2_value = registers[registerMap[_ID2_latch.register_r2]];
+			if(_ID2_latch.operation != addimmediate){
+				_RR_latch.reg3_value = registers[registerMap[_ID2_latch.register_r3]];
+			}else{
+				_RR_latch.reg3_value = _ID2_latch.immediate;
+			}
 
+		}else if(_ID2_latch.alu_operation && _ID2_latch.branch_instruction){
+			_RR_latch.alu_operation = true;
+			_RR_latch.op  = _ID2_latch.op;
+			_RR_latch.branch_instruction = true;
+			_RR_latch._stage7 =true;
+			_RR_latch.destination_register = _ID2_latch.register_r1;
+			_RR_latch.reg2_value = registers[registerMap[_ID2_latch.register_r2]];
+			_RR_latch.reg3_value = registers[registerMap[_ID2_latch.register_r3]];
+
+		}else if(_ID2_latch.alu_operation == lw_ || sw_){
+			_RR_latch.alu_operation = true;
+			_RR_latch.branch_instruction = false;
+			_RR_latch._stage7 =false;
+			_RR_latch.destination_register = _ID2_latch.register_r1;
+			_RR_latch.location =  _ID2_latch.register_r2;
+			_RR_latch.op  = _ID2_latch.op;
+			_RR_latch.reg2_value =0;
+			_RR_latch.reg3_value =0;
+			if(_ID2_latch.operation = sw_){
+				_RR_latch.reg1_value = registers[registerMap[_ID2_latch.register_r1]];
+			}
+		}
 		return;
 	}
 //ALU Stage
 	void ALU(bool ALU_Control){
-
+		exit_code ret = (exit_code)instructions_execute[_RR_latch.op](*this,_RR_latch.destination_register,_RR_latch.reg2_value,_RR_latch.reg3_value);
 	}
 
 
 //MEM Stage
 	void MEM(bool Mem_Control){
-
+		_MEM_latch.reg_write =_EX_latch.reg_write;
+		_MEM_latch.dest_register = _EX_latch.dest_register;
+		if(_EX_latch.mem_read){
+			_MEM_latch.data = data[_EX_latch.load_or_store_mem_address];
+		}else if(_EX_latch.mem_write){
+			data[_EX_latch.load_or_store_mem_address] = _EX_latch.data;
+		}
 	}
 
 // Writeback
