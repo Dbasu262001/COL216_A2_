@@ -16,15 +16,18 @@
 #include <iostream>
 #include <boost/tokenizer.hpp>
 struct Control_Signals{
-	int reg_destination;
-	int branch;
-	int Mem_read;
-	int ALU_Op;
-	int Mem_Write;
-	int ALU_Src;
-	int Reg_Write;
-	int ALU_zero;
-	int ALU_Control;
+	bool WB_1;
+	bool MEM_Stage_1;
+	bool MEM_Stage_2;
+	bool ALU_Stage_;
+	bool RR_;
+	bool ID_Stage_1;
+	bool ID_Stage_2;
+	bool IF_Stage_1;
+	bool IF_Stage_2;
+	bool stage_7;
+	bool stage_9;
+
 };
 struct IF{
 	int PC_value;
@@ -75,7 +78,6 @@ struct EX{
 struct MEM{
 	std::string dest_register;
 	bool reg_write;
-	bool branch_satisfied;
 	int data;
 
 };
@@ -125,7 +127,7 @@ struct MIPS_Architecture
 
 
 	//Structures Added
-	struct Control_Signals  _pipeline_controls;
+	struct Control_Signals  pipeline_controls;
 	struct IF _IF1_latch;
 	struct IF _IF2_latch;
 	struct ID _ID1_latch;
@@ -807,19 +809,20 @@ struct MIPS_Architecture
 //Stages of ALU Execution
 
 //Instruction fetch
-	int IF_Stage1(bool IF_Control,bool stall,int Program_Counter,int clockCycles){
+	int IF_Stage1(bool IF_Control,int Program_Counter,int clockCycles){
 		if(IF_Control == false){
 			return 0;
 		}
-		if(stall ==false){
-			std::cout<<"Stalling: IF Stage 1"<<std::endl;
-		}else{
-			_IF1_latch.command = commands[Program_Counter];
-			_IF1_latch.PC_value = Program_Counter;
+		if(pipeline_controls.IF_Stage_2 == true){
+			std::cout<<"Stalling : "<< clockCycles<<std::endl;
+			return 0;
 		}
+		
+		_IF1_latch.command = commands[Program_Counter];
+		_IF1_latch.PC_value = Program_Counter;
 		return 0;
 	}
-	int IF_Stage2(bool IF_Control,bool stall,int clockCycles,std::vector<std::string> &command){
+	int IF_Stage2(bool IF_Control,bool stall,int clockCycles){
 		if(IF_Control == false){
 			return 0;
 		}
@@ -832,7 +835,7 @@ struct MIPS_Architecture
 		return 0;
 	}
 //Instruction Decode
-	int ID_Stage1(bool ID_Control,bool stall,std::vector<std::string> &command,struct ID* latch,int clockCycles){
+	int ID_Stage1(bool ID_Control,bool stall,std::vector<std::string> &command,int clockCycles){
 		if(ID_Control ==false){
 			return 0;
 		}
@@ -904,13 +907,14 @@ struct MIPS_Architecture
 		return;
 	}
 //ALU Stage
-	void ALU(bool ALU_Control){
+	int ALU_Stage(bool ALU_Control){
 		exit_code ret = (exit_code)instructions_execute[_RR_latch.op](*this,_RR_latch.destination_register,_RR_latch.reg2_value,_RR_latch.reg3_value);
+	return 0;
 	}
 
 
 //MEM Stage
-	void MEM(bool Mem_Control){
+	int  MEM_stage1(bool Mem_Control){
 		_MEM_latch.reg_write =_EX_latch.reg_write;
 		_MEM_latch.dest_register = _EX_latch.dest_register;
 		if(_EX_latch.mem_read){
@@ -918,17 +922,41 @@ struct MIPS_Architecture
 		}else if(_EX_latch.mem_write){
 			data[_EX_latch.load_or_store_mem_address] = _EX_latch.data;
 		}
+		return 0;
 	}
 
+	int MEM_Stage2(bool MEM_Control){
+		_MEM2_latch = _MEM_latch;
+	}
 // Writeback
-	void WB(bool WB_Control){
-
+	int WB(bool WB_Control,bool stage_7,bool stage_9){
+		if(stage_7 && stage_9 || stage_9){
+			stage_9 = false;
+			if(_MEM2_latch.reg_write){
+				registers[registerMap[_MEM2_latch.dest_register]] = _MEM2_latch.data;
+			}
+		}else if(stage_7){
+			stage_7 = false;
+			if(_MEM2_latch.reg_write){
+				registers[registerMap[_MEM2_latch.dest_register]] = _MEM2_latch.data;
+			}
+		}
 		
 	}
 
 
 	void execute79pipeline(){
-		
+		pipeline_controls.ALU_Stage_ = false;
+		pipeline_controls.ID_Stage_1 = false;
+		pipeline_controls.ID_Stage_2 = false;
+		pipeline_controls.IF_Stage_1 = true;
+		pipeline_controls.IF_Stage_2 = false;
+		pipeline_controls.MEM_Stage_1 = false;
+		pipeline_controls.MEM_Stage_2 = false;
+		pipeline_controls.RR_ = false;
+		pipeline_controls.stage_7 = false;
+		pipeline_controls.stage_9 = false;
+		pipeline_controls.WB_1 = false;
 		if (commands.size() >= MAX / 4)
 		{
 			handleExit(MEMORY_ERROR, 0);
@@ -940,8 +968,18 @@ struct MIPS_Architecture
 			++clockCycles;
 			if(PCcurr !=commands.size()){
 				std::vector<std::string> &command = commands[PCcurr];
-
 			}
+			WB(true,true,true);
+			MEM_Stage2(true);
+			MEM_stage1(true);
+			ALU_Stage(true);
+			RR(true);
+			ID_Stage2(true,true);
+			ID_Stage1(true,true,_IF2_latch.command,clockCycles);
+			IF_Stage2(true,true,clockCycles);
+			IF_Stage1(true,PCcurr,clockCycles);
+			printRegisters(clockCycles);
+
 		}
 
 
