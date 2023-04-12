@@ -1144,6 +1144,9 @@ struct MIPS_Architecture
 			std::cout << registers[i] << ' ';
 		std::cout <<'\n';
 		std::cout << memoryDelta.size() << ' ';
+		if(memoryDelta.size()==0){
+			std::cout<<'\n';
+		}
 		for (auto &p : memoryDelta)
 			std::cout << p.first << ' ' << p.second <<'\n';
 		memoryDelta.clear();
