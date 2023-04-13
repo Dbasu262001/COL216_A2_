@@ -65,6 +65,8 @@ struct RR{
 	std::string label;
 	std::string location;
 	//bool load_store;
+	bool bypass;
+	int  base_register_value;
 };
 
 struct EX{
@@ -84,9 +86,6 @@ struct MEM{
 	std::string dest_register;
 	bool reg_write;
 	int data;
-
-};
-struct WB{
 
 };
 
@@ -143,8 +142,6 @@ struct MIPS_Architecture
 	struct RR _RR_latch;
 	struct MEM _MEM_latch;
 	struct MEM _MEM2_latch;
-	struct WB  _WB_latch;
-
 	// constructor to initialise the instruction set
 	MIPS_Architecture(std::ifstream &file)
 	{
@@ -466,7 +463,12 @@ struct MIPS_Architecture
 		_EX_latch.mem_write = false;
 		_EX_latch.reg_write = true;
 		_EX_latch.dest_register = dest_regs;
-		_EX_latch.load_or_store_mem_address = locateAddress(_RR_latch.location);
+		if(!_RR_latch.bypass){
+			_EX_latch.load_or_store_mem_address = locateAddress(_RR_latch.location);
+		}else{
+			_EX_latch.load_or_store_mem_address = getaddress(_RR_latch.location);
+			_RR_latch.bypass = false;
+		}
 		_EX_latch.zero_output = false;
 		_EX_latch.branch_instruction = false;
 
@@ -478,8 +480,12 @@ struct MIPS_Architecture
 		_EX_latch.reg_write = false;
 		_EX_latch.data = _RR_latch.reg1_value;
 		_EX_latch.mem_write = true;
-
-		_EX_latch.load_or_store_mem_address = locateAddress(_RR_latch.location);
+		if(!_RR_latch.bypass){
+			_EX_latch.load_or_store_mem_address = locateAddress(_RR_latch.location);
+		}else{
+			_EX_latch.load_or_store_mem_address = getaddress(_RR_latch.location);
+			_RR_latch.bypass = false;
+		}
 		_EX_latch.zero_output = false;
 		_EX_latch.branch_instruction = false;
 
@@ -620,6 +626,38 @@ struct MIPS_Architecture
 				if (!checkRegister(reg))
 					return -3;
 				int address = registers[registerMap[reg]] + offset;
+				if (address % 4 || address < int(4 * commands.size()) || address >= MAX)
+					return -3;
+				return address / 4;
+			}
+			catch (std::exception &e)
+			{
+				return -4;
+			}
+		}
+		try
+		{
+			int address = stoi(location);
+			if (address % 4 || address < int(4 * commands.size()) || address >= MAX)
+				return -3;
+			return address / 4;
+		}
+		catch (std::exception &e)
+		{
+			return -4;
+		}
+	}
+	int getaddress(std::string location){
+		if (location.back() == ')')
+		{
+			try
+			{
+				int lparen = location.find('('), offset = stoi(lparen == 0 ? "0" : location.substr(0, lparen));
+				std::string reg = location.substr(lparen + 1);
+				reg.pop_back();
+				if (!checkRegister(reg))
+					return -3;
+				int address = _RR_latch.base_register_value+ offset;
 				if (address % 4 || address < int(4 * commands.size()) || address >= MAX)
 					return -3;
 				return address / 4;
@@ -1224,6 +1262,7 @@ struct MIPS_Architecture
 			IF_Stage1(PCcurr,clockCycles);
 			printRegisters(clockCycles);
 			if(pipeline_controls.count == 9){
+				std::cout<<clockCycles<<std::endl;
 				break;
 			}
 			}
@@ -1334,20 +1373,55 @@ int RR_Stage_bypass(int clockCycles){
 			_RR_latch.branch_instruction = true;
 			_RR_latch._stage7 =true;
 			_RR_latch.destination_register = _ID2_latch.register_r1;
-			_RR_latch.reg2_value = registers[registerMap[_ID2_latch.register_r2]];
+			//Setting reg3 value
+			if(t3 == registerMap[_ID2_latch.register_r3]){
+				_RR_latch.reg3_value = _EX_latch.data;
+			}else if(t4 == registerMap[_ID2_latch.register_r3]){
+				_RR_latch.reg3_value = _MEM2_latch.data;
+			}else{
 			_RR_latch.reg3_value = registers[registerMap[_ID2_latch.register_r3]];
-
+			}
+			//setting r2 value
+			if(t3 == registerMap[_ID2_latch.register_r2]){
+				_RR_latch.reg2_value = _EX_latch.data;
+			}else if(t4 == registerMap[_ID2_latch.register_r2]){
+				_RR_latch.reg2_value = _MEM2_latch.data;
+			}else{
+			_RR_latch.reg2_value = registers[registerMap[_ID2_latch.register_r2]];
+			}
 		}else if(_ID2_latch.operation == lw_ || sw_){
 			 if(_ID2_latch.operation == lw_){
-				if(t3 ==get_register(_ID2_latch.register_r2) || t1 ==get_register(_ID2_latch.register_r2) || t2 ==get_register(_ID2_latch.register_r2) ){
+				if(t1 ==get_register(_ID2_latch.register_r2) || t2 ==get_register(_ID2_latch.register_r2) ){
 					return 0;
+				}else if(t3  ==get_register(_ID2_latch.register_r2)){
+					_RR_latch.bypass = true;
+					_RR_latch.base_register_value = _EX_latch.data;
+				}else if( t4 == get_register(_ID2_latch.register_r2)){
+					_RR_latch.bypass = true;
+					_RR_latch.base_register_value = _MEM2_latch.data;
 				}
 			 }
 			if(_ID2_latch.operation = sw_){
-				if(t3 ==get_register(_ID2_latch.register_r2) || t3 == registerMap[_ID2_latch.register_r1] || t1 ==get_register(_ID2_latch.register_r2) || t2 ==get_register(_ID2_latch.register_r2) || t1 == registerMap[_ID2_latch.register_r1] || t2 == registerMap[_ID2_latch.register_r1]){
+				if( t1 ==get_register(_ID2_latch.register_r2) || t2 ==get_register(_ID2_latch.register_r2) || t1 == registerMap[_ID2_latch.register_r1] || t2 == registerMap[_ID2_latch.register_r1]){
 					return 0;
 				}
-				_RR_latch.reg1_value = registers[registerMap[_ID2_latch.register_r1]];
+				if(t3 == registerMap[_ID2_latch.register_r1] ){
+					_RR_latch.reg1_value = _EX_latch.data;
+				}else if(t4 ==registerMap[_ID2_latch.register_r1] ){
+					_RR_latch.reg1_value = _MEM2_latch.data;
+				}else{
+					_RR_latch.reg1_value = registers[registerMap[_ID2_latch.register_r1]];
+				}
+				if(t3 ==get_register(_ID2_latch.register_r2)  ){
+					_RR_latch.bypass = true;
+					_RR_latch.base_register_value = _EX_latch.data;
+				}else if(t4 ==get_register(_ID2_latch.register_r2)){
+					_RR_latch.base_register_value = _MEM2_latch.data;
+					_RR_latch.bypass == true;
+				}else{
+					_RR_latch.bypass == false;
+				}
+
 			}
 			_RR_latch.alu_operation = true;
 			_RR_latch.branch_instruction = false;
@@ -1363,15 +1437,6 @@ int RR_Stage_bypass(int clockCycles){
 		pipeline_controls.RR_ = false;
 		return 0;
 }
-int ALU_Stage_bypass(int clockCycles){
-
-
-	return 0;
-}
-
-
-
-
 
 //_79stage with bypassing
 	void execute79pipelined_bypassing(){
@@ -1397,13 +1462,18 @@ int ALU_Stage_bypass(int clockCycles){
 		pipeline_controls.count = 8;
 		while(true){
 			++clockCycles;
-
-
-
-
-
-
-			if(pipeline_controls.count ==9){
+			WB(clockCycles);
+			MEM_Stage2(clockCycles);
+			MEM_stage1(clockCycles);
+			ALU_Stage(clockCycles);
+			RR_Stage_bypass(clockCycles);
+			ID_Stage2(clockCycles);
+			ID_Stage1(_IF2_latch.command,clockCycles);
+			IF_Stage2(clockCycles);
+			IF_Stage1(PCcurr,clockCycles);
+			printRegisters(clockCycles);
+			if(pipeline_controls.count == 9){
+				std::cout<<clockCycles<<std::endl;
 				break;
 			}
 		}
