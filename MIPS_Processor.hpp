@@ -1232,7 +1232,7 @@ struct MIPS_Architecture
 		return;
 	}
 // std::cout<<pipeline_controls.IF_Stage_1<<pipeline_controls.IF_Stage_2<<pipeline_controls.ID_Stage_1 <<pipeline_controls.ID_Stage_2<<pipeline_controls.RR_<< pipeline_controls.ALU_Stage_<<pipeline_controls.MEM_Stage_1<<pipeline_controls.MEM_Stage_2<<pipeline_controls.WB_1<<std::endl;
-int ID_Stage1_bypass(int clockCycles){
+/*int ID_Stage1_bypass(int clockCycles){
 
 
 
@@ -1245,9 +1245,114 @@ int ID_Stage2_bypass(int clockCycles){
 
 	return 0;
 }
-
+*/
 int RR_Stage_bypass(int clockCycles){
-	return 0;
+		if(pipeline_controls.RR_ ==false){
+			return 0;
+		}
+		if(pipeline_controls.ALU_Stage_){
+			return 0;						
+		}
+		//Check Stalls
+		int t1 =-10,t2 =-10,t3=-10,t4 = -10;
+		if(pipeline_controls.WB_1){ //Ready to bypass
+			if(pipeline_controls.stage_7 ==true && _EX_latch.reg_write==true){
+				t3 = registerMap[_EX_latch.dest_register];
+			}else if(pipeline_controls.stage_9 ==true && _MEM2_latch.reg_write == true){
+				t4 = registerMap[_MEM2_latch.dest_register];
+			}
+		}
+		if(pipeline_controls.MEM_Stage_2 ==true && _MEM_latch.reg_write ==true){  //STall if found here 
+			t1 = registerMap[_MEM_latch.dest_register];
+		}
+		if(pipeline_controls.MEM_Stage_1 == true && _EX_latch.reg_write == true){  //Stall 
+			t2 = registerMap[_EX_latch.dest_register]; 
+		}
+		if(_ID2_latch.operation == j_){
+			PCcurr = address[_ID2_latch.label];
+			if(pipeline_controls.ID_Stage_2 == true){
+				pipeline_controls.ID_Stage_2 = false;
+				pipeline_controls.count = pipeline_controls.count + 1;
+			}		
+			if(pipeline_controls.ID_Stage_1 == true){
+				pipeline_controls.ID_Stage_1 = false;
+				pipeline_controls.count = pipeline_controls.count +1;
+			}
+			if(pipeline_controls.IF_Stage_2 == true){
+				pipeline_controls.IF_Stage_2 = false;
+				pipeline_controls.count = pipeline_controls.count +1;
+			}
+			pipeline_controls.RR_ = false;
+			pipeline_controls.count = pipeline_controls.count +1;
+			if(!pipeline_controls.IF_Stage_1){
+				pipeline_controls.IF_Stage_1 = true;
+				pipeline_controls.count=pipeline_controls.count-1;
+				}
+			return 0;
+			
+		}else if(!_ID2_latch.branch_instruction && _ID2_latch._stages7 ==true){
+
+			if(_ID2_latch.operation != addimmediate){
+				if(t1 == registerMap[_ID2_latch.register_r3] || t1 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r3]){
+					return 0;
+				}else if(t3 == registerMap[_ID2_latch.register_r3] || t3 == registerMap[_ID2_latch.register_r2]){
+					_RR_latch.reg3_value = _E
+
+				}else{
+					_RR_latch.reg3_value = registers[registerMap[_ID2_latch.register_r3]];
+				}
+			}else{
+				if(t3 == registerMap[_ID2_latch.register_r2] || t1 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r2] ){
+					return 0;
+				}
+				_RR_latch.reg3_value = _ID2_latch.immediate;
+			}
+			_RR_latch.op  = _ID2_latch.op;
+			_RR_latch.alu_operation = true;
+			_RR_latch.branch_instruction = false;
+			_RR_latch._stage7 =true;
+			_RR_latch.destination_register = _ID2_latch.register_r1;
+			_RR_latch.reg2_value = registers[registerMap[_ID2_latch.register_r2]];
+			
+
+		}else if(_ID2_latch.branch_instruction){
+			if(t3 == registerMap[_ID2_latch.register_r3] || t3 == registerMap[_ID2_latch.register_r2] ||t1 == registerMap[_ID2_latch.register_r3] || t1 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r3]){
+					return 0;
+				}
+			_RR_latch.label = _ID2_latch.label;
+			_RR_latch.alu_operation = true;
+			_RR_latch.op  = _ID2_latch.op;
+			_RR_latch.branch_instruction = true;
+			_RR_latch._stage7 =true;
+			_RR_latch.destination_register = _ID2_latch.register_r1;
+			_RR_latch.reg2_value = registers[registerMap[_ID2_latch.register_r2]];
+			_RR_latch.reg3_value = registers[registerMap[_ID2_latch.register_r3]];
+
+		}else if(_ID2_latch.operation == lw_ || sw_){
+			 if(_ID2_latch.operation == lw_){
+				if(t3 ==get_register(_ID2_latch.register_r2) || t1 ==get_register(_ID2_latch.register_r2) || t2 ==get_register(_ID2_latch.register_r2) ){
+					return 0;
+				}
+			 }
+			if(_ID2_latch.operation = sw_){
+				if(t3 ==get_register(_ID2_latch.register_r2) || t3 == registerMap[_ID2_latch.register_r1] || t1 ==get_register(_ID2_latch.register_r2) || t2 ==get_register(_ID2_latch.register_r2) || t1 == registerMap[_ID2_latch.register_r1] || t2 == registerMap[_ID2_latch.register_r1]){
+					return 0;
+				}
+				_RR_latch.reg1_value = registers[registerMap[_ID2_latch.register_r1]];
+			}
+			_RR_latch.alu_operation = true;
+			_RR_latch.branch_instruction = false;
+			_RR_latch._stage7 =false;
+			_RR_latch.destination_register = _ID2_latch.register_r1;
+			_RR_latch.location =  _ID2_latch.register_r2;
+			_RR_latch.op  = _ID2_latch.op;
+			_RR_latch.reg2_value =0;
+			_RR_latch.reg3_value =0;
+			
+		}
+		pipeline_controls.ALU_Stage_ =true;
+		pipeline_controls.RR_ = false;
+		return 0;
 }
 int ALU_Stage_bypass(int clockCycles){
 
