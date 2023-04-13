@@ -418,7 +418,6 @@ struct MIPS_Architecture
 		_EX_latch.mem_write =false;
 		pipeline_controls.stage_7 = true;
 		_EX_latch.dest_register = dest_regs;
-		std::cout<<"I am called bneq"<<std::endl;
 
 		if(a !=b){
 			_EX_latch.branch_satisfied = true; 
@@ -438,7 +437,6 @@ struct MIPS_Architecture
 		_EX_latch.mem_write =false;
 		_EX_latch.dest_register = dest_regs;
 		pipeline_controls.stage_7 = true;
-		std::cout<<"I am called beq"<<std::endl;
 		if(a ==b){
 			_EX_latch.branch_satisfied = true; 
 			_EX_latch.label_address = address[_RR_latch.label];
@@ -850,7 +848,6 @@ struct MIPS_Architecture
 			PCcurr = PCcurr -1;
 			return 0;
 		}
-		std::cout<<"Program Counter "<<Program_Counter<<std::endl;
 		if(Program_Counter < commands.size()){
 			_IF1_latch.command = commands[Program_Counter];
 			pipeline_controls.IF_Stage_2 = true;
@@ -941,13 +938,13 @@ struct MIPS_Architecture
 			if(pipeline_controls.ID_Stage_2 == true){
 				pipeline_controls.ID_Stage_2 = false;
 				pipeline_controls.count = pipeline_controls.count + 1;
-			}
+			}		
 			if(pipeline_controls.ID_Stage_1 == true){
 				pipeline_controls.ID_Stage_1 = false;
 				pipeline_controls.count = pipeline_controls.count +1;
 			}
 			if(pipeline_controls.IF_Stage_2 == true){
-				pipeline_controls.ID_Stage_2 = false;
+				pipeline_controls.IF_Stage_2 = false;
 				pipeline_controls.count = pipeline_controls.count +1;
 			}
 			pipeline_controls.RR_ = false;
@@ -956,7 +953,6 @@ struct MIPS_Architecture
 				pipeline_controls.IF_Stage_1 = true;
 				pipeline_controls.count=pipeline_controls.count-1;
 				}
-
 			return 0;
 			
 		}else if(!_ID2_latch.branch_instruction && _ID2_latch._stages7 ==true){
@@ -1124,8 +1120,7 @@ struct MIPS_Architecture
 					pipeline_controls.IF_Stage_1 = true;
 					pipeline_controls.count=pipeline_controls.count-1;
 				}
-								std::cout<<"hhhhhhhhhhhhhh"<<PCcurr<<std::endl;
-			std::cout<<pipeline_controls.IF_Stage_1<<pipeline_controls.IF_Stage_2<<pipeline_controls.ID_Stage_1 <<pipeline_controls.ID_Stage_2<<pipeline_controls.RR_<< pipeline_controls.ALU_Stage_<<pipeline_controls.MEM_Stage_1<<pipeline_controls.MEM_Stage_2<<pipeline_controls.WB_1<<std::endl;
+//			std::cout<<pipeline_controls.IF_Stage_1<<pipeline_controls.IF_Stage_2<<pipeline_controls.ID_Stage_1 <<pipeline_controls.ID_Stage_2<<pipeline_controls.RR_<< pipeline_controls.ALU_Stage_<<pipeline_controls.MEM_Stage_1<<pipeline_controls.MEM_Stage_2<<pipeline_controls.WB_1<<std::endl;
 				return 0;
 
 				}
@@ -1228,11 +1223,10 @@ struct MIPS_Architecture
 			IF_Stage2(clockCycles);
 			IF_Stage1(PCcurr,clockCycles);
 			printRegisters(clockCycles);
-			std::cout<<pipeline_controls.count<<"   "<<PCcurr<<std::endl;
 			if(pipeline_controls.count == 9){
 				break;
 			}
-			std::cout<<pipeline_controls.IF_Stage_1<<pipeline_controls.IF_Stage_2<<pipeline_controls.ID_Stage_1 <<pipeline_controls.ID_Stage_2<<pipeline_controls.RR_<< pipeline_controls.ALU_Stage_<<pipeline_controls.MEM_Stage_1<<pipeline_controls.MEM_Stage_2<<pipeline_controls.WB_1<<std::endl;
+			// std::cout<<pipeline_controls.IF_Stage_1<<pipeline_controls.IF_Stage_2<<pipeline_controls.ID_Stage_1 <<pipeline_controls.ID_Stage_2<<pipeline_controls.RR_<< pipeline_controls.ALU_Stage_<<pipeline_controls.MEM_Stage_1<<pipeline_controls.MEM_Stage_2<<pipeline_controls.WB_1<<std::endl;
 			}
 			
 		}
