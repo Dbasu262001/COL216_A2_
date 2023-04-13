@@ -1226,12 +1226,74 @@ struct MIPS_Architecture
 			if(pipeline_controls.count == 9){
 				break;
 			}
-			// std::cout<<pipeline_controls.IF_Stage_1<<pipeline_controls.IF_Stage_2<<pipeline_controls.ID_Stage_1 <<pipeline_controls.ID_Stage_2<<pipeline_controls.RR_<< pipeline_controls.ALU_Stage_<<pipeline_controls.MEM_Stage_1<<pipeline_controls.MEM_Stage_2<<pipeline_controls.WB_1<<std::endl;
 			}
 			
 		}
+		return;
+	}
+// std::cout<<pipeline_controls.IF_Stage_1<<pipeline_controls.IF_Stage_2<<pipeline_controls.ID_Stage_1 <<pipeline_controls.ID_Stage_2<<pipeline_controls.RR_<< pipeline_controls.ALU_Stage_<<pipeline_controls.MEM_Stage_1<<pipeline_controls.MEM_Stage_2<<pipeline_controls.WB_1<<std::endl;
+int ID_Stage1_bypass(int clockCycles){
 
 
+
+	return 0;
+}
+
+
+int ID_Stage2_bypass(int clockCycles){
+
+
+	return 0;
+}
+
+int RR_Stage_bypass(int clockCycles){
+	return 0;
+}
+int ALU_Stage_bypass(int clockCycles){
+
+
+	return 0;
+}
+
+
+
+
+
+//_79stage with bypassing
+	void execute79pipelined_bypassing(){
+		pipeline_controls.ALU_Stage_ = false;
+		pipeline_controls.ID_Stage_1 = false;
+		pipeline_controls.ID_Stage_2 = false;
+		pipeline_controls.IF_Stage_1 = true;
+		pipeline_controls.IF_Stage_2 = false;
+		pipeline_controls.MEM_Stage_1 = false;
+		pipeline_controls.MEM_Stage_2 = false;
+		pipeline_controls.RR_ = false;
+		pipeline_controls.stage_7 = false;
+		pipeline_controls.stage_9 = false;
+		pipeline_controls.WB_1 = false;
+		if (commands.size() >= MAX / 4)
+		{
+			handleExit(MEMORY_ERROR, 0);
+			return;
+		}
+
+		int clockCycles = 0;
+		PCcurr = -1;
+		pipeline_controls.count = 8;
+		while(true){
+			++clockCycles;
+
+
+
+
+
+
+			if(pipeline_controls.count ==9){
+				break;
+			}
+		}
+		return ;
 	}
 
 
