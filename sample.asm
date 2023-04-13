@@ -8,5 +8,4 @@ loop:
 	addi	$s0, $s0, 100
 	addi	$t1, $t1, 1
 	j		loop
-
 exit:

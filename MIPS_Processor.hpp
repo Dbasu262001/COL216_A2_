@@ -17,6 +17,7 @@
 #include <boost/tokenizer.hpp>
 struct Control_Signals{
 	bool WB_1;
+	bool WB_branch;
 	bool MEM_Stage_1;
 	bool MEM_Stage_2;
 	bool ALU_Stage_;
@@ -417,9 +418,14 @@ struct MIPS_Architecture
 		_EX_latch.mem_write =false;
 		pipeline_controls.stage_7 = true;
 		_EX_latch.dest_register = dest_regs;
+		std::cout<<"I am called bneq"<<std::endl;
+
 		if(a !=b){
 			_EX_latch.branch_satisfied = true; 
+			pipeline_controls.WB_branch = true;
+			_EX_latch.label_address = address[_RR_latch.label];
 		}else{
+			pipeline_controls.WB_branch = false;
 			_EX_latch.branch_satisfied = false; 
 		}
 		_EX_latch.branch_instruction = true;
@@ -432,10 +438,14 @@ struct MIPS_Architecture
 		_EX_latch.mem_write =false;
 		_EX_latch.dest_register = dest_regs;
 		pipeline_controls.stage_7 = true;
+		std::cout<<"I am called beq"<<std::endl;
 		if(a ==b){
 			_EX_latch.branch_satisfied = true; 
+			_EX_latch.label_address = address[_RR_latch.label];
+			pipeline_controls.WB_branch = true;
 		}else{
 			_EX_latch.branch_satisfied = false; 
+			pipeline_controls.WB_branch = false;
 		}
 		_EX_latch.branch_instruction = true;
 		return 0;
@@ -837,8 +847,10 @@ struct MIPS_Architecture
 			return 0;
 		}
 		if(pipeline_controls.IF_Stage_2 == true){
+			PCcurr = PCcurr -1;
 			return 0;
 		}
+		std::cout<<"Program Counter "<<Program_Counter<<std::endl;
 		if(Program_Counter < commands.size()){
 			_IF1_latch.command = commands[Program_Counter];
 			pipeline_controls.IF_Stage_2 = true;
@@ -925,11 +937,27 @@ struct MIPS_Architecture
 			t2 = registerMap[_EX_latch.dest_register]; 
 		}
 		if(_ID2_latch.operation == j_){
-			_RR_latch.operation = j_;
-			_RR_latch.op = _ID2_latch.op;
-			_RR_latch.label = _ID2_latch.label;
-			_RR_latch._stage7 = true;
-			_RR_latch.destination_register = _ID2_latch.label;
+			PCcurr = address[_ID2_latch.label];
+			if(pipeline_controls.ID_Stage_2 == true){
+				pipeline_controls.ID_Stage_2 = false;
+				pipeline_controls.count = pipeline_controls.count + 1;
+			}
+			if(pipeline_controls.ID_Stage_1 == true){
+				pipeline_controls.ID_Stage_1 = false;
+				pipeline_controls.count = pipeline_controls.count +1;
+			}
+			if(pipeline_controls.IF_Stage_2 == true){
+				pipeline_controls.ID_Stage_2 = false;
+				pipeline_controls.count = pipeline_controls.count +1;
+			}
+			pipeline_controls.RR_ = false;
+			pipeline_controls.count = pipeline_controls.count +1;
+			if(!pipeline_controls.IF_Stage_1){
+				pipeline_controls.IF_Stage_1 = true;
+				pipeline_controls.count=pipeline_controls.count-1;
+				}
+
+			return 0;
 			
 		}else if(!_ID2_latch.branch_instruction && _ID2_latch._stages7 ==true){
 
@@ -996,14 +1024,22 @@ struct MIPS_Architecture
 		if(!pipeline_controls.ALU_Stage_){
 			return 0;
 		}
+		if(_RR_latch._stage7 == true && _RR_latch.branch_instruction == true){
+			exit_code ret = (exit_code)instructions_execute[_RR_latch.op](*this,_RR_latch.destination_register,_RR_latch.reg2_value,_RR_latch.reg3_value);
+			pipeline_controls.stage_7 = false;
+			pipeline_controls.ALU_Stage_ = false;
+			pipeline_controls.count = pipeline_controls.count+1;
+			return 0;
+		}
 		if(_RR_latch._stage7){
-			if(pipeline_controls.WB_1){
+			if(pipeline_controls.WB_1 ==true){
 			return 0;
 			}else{
 				exit_code ret = (exit_code)instructions_execute[_RR_latch.op](*this,_RR_latch.destination_register,_RR_latch.reg2_value,_RR_latch.reg3_value);
 				pipeline_controls.stage_7 =true;
 				pipeline_controls.WB_1 =true;
 				pipeline_controls.ALU_Stage_ =false;
+
 			}
 		}else{
 			if(pipeline_controls.MEM_Stage_1){
@@ -1057,10 +1093,87 @@ struct MIPS_Architecture
 // Writeback
 	int WB(int clockCycles){
 		if(pipeline_controls.WB_1==false){
+			if(pipeline_controls.WB_branch){
+				if(_EX_latch.branch_satisfied == true && _EX_latch.branch_instruction == true){
+					_EX_latch.branch_instruction = false;
+					_EX_latch.branch_satisfied = false;
+					pipeline_controls.WB_branch = false;
+					PCcurr = _EX_latch.label_address;
+					if(pipeline_controls.ALU_Stage_==true){
+						pipeline_controls.ALU_Stage_ = false;
+						pipeline_controls.count = pipeline_controls.count +1;
+					}
+					if(pipeline_controls.RR_==true){
+						pipeline_controls.RR_ = false;
+						pipeline_controls.count = pipeline_controls.count +1;
+					}
+					if(pipeline_controls.ID_Stage_2 == true){
+						pipeline_controls.ID_Stage_2 = false;
+						pipeline_controls.count = pipeline_controls.count +1;
+					}
+					if(pipeline_controls.ID_Stage_1 == true){
+						pipeline_controls.ID_Stage_1 = false;
+						pipeline_controls.count = pipeline_controls.count +1;
+					}
+					if(pipeline_controls.IF_Stage_2 == true){
+						pipeline_controls.ID_Stage_2 = false;
+						pipeline_controls.count = pipeline_controls.count +1;
+					}
+					PCcurr=_EX_latch.label_address;
+				if(pipeline_controls.IF_Stage_1 == false){
+					pipeline_controls.IF_Stage_1 = true;
+					pipeline_controls.count=pipeline_controls.count-1;
+				}
+								std::cout<<"hhhhhhhhhhhhhh"<<PCcurr<<std::endl;
+			std::cout<<pipeline_controls.IF_Stage_1<<pipeline_controls.IF_Stage_2<<pipeline_controls.ID_Stage_1 <<pipeline_controls.ID_Stage_2<<pipeline_controls.RR_<< pipeline_controls.ALU_Stage_<<pipeline_controls.MEM_Stage_1<<pipeline_controls.MEM_Stage_2<<pipeline_controls.WB_1<<std::endl;
+				return 0;
+
+				}
+
+				pipeline_controls.WB_branch=false;
+				
+
+			}
 			PCcurr= PCcurr+1;
 			return 0;
 		}
-
+		if(pipeline_controls.WB_branch){
+				pipeline_controls.WB_branch=false;
+				if(_EX_latch.branch_satisfied == true && _EX_latch.branch_instruction == true){
+					
+					PCcurr = _EX_latch.label_address-1;
+					if(pipeline_controls.ALU_Stage_==true){
+						pipeline_controls.ALU_Stage_ = false;
+						pipeline_controls.count = pipeline_controls.count +1;
+					}
+					if(pipeline_controls.RR_==true){
+						pipeline_controls.RR_ = false;
+						pipeline_controls.count = pipeline_controls.count +1;
+					}
+					if(pipeline_controls.ID_Stage_2 == true){
+						pipeline_controls.ID_Stage_2 = false;
+						pipeline_controls.count = pipeline_controls.count +1;
+					}
+					if(pipeline_controls.ID_Stage_1 == true){
+						pipeline_controls.ID_Stage_1 = false;
+						pipeline_controls.count = pipeline_controls.count +1;
+					}
+					if(pipeline_controls.IF_Stage_2 == true){
+						pipeline_controls.ID_Stage_2 = false;
+						pipeline_controls.count = pipeline_controls.count +1;
+					}
+					PCcurr=_EX_latch.label_address;
+					if(!pipeline_controls.IF_Stage_1){
+						pipeline_controls.IF_Stage_1 = true;
+						pipeline_controls.count=pipeline_controls.count-1;
+					}
+				}
+				_EX_latch.branch_instruction = false;
+				_EX_latch.branch_satisfied = false;
+				pipeline_controls.WB_branch = false;
+				pipeline_controls.stage_7 = false;
+		}
+		
 		if(pipeline_controls.stage_9 == true){
 			pipeline_controls.stage_9 = false;
 			if(_MEM2_latch.reg_write){
@@ -1069,17 +1182,7 @@ struct MIPS_Architecture
 			pipeline_controls.WB_1 = false;
 		}else if(pipeline_controls.stage_7 ==true){
 			pipeline_controls.stage_7 = false;
-			if(_EX_latch.jump){
-				PCcurr = _EX_latch.label_address;
-				pipeline_controls.WB_1 = false;
-
-				return 0;
-			}else if(_EX_latch.branch_instruction ==true && _EX_latch.branch_satisfied ==true){
-				PCcurr = _EX_latch.label_address;
-				pipeline_controls.WB_1 = false;
-
-				return 0;
-			}else if(_EX_latch.reg_write==true){
+			if(_EX_latch.reg_write==true){
 				registers[registerMap[_EX_latch.dest_register]] = _EX_latch.data;
 			}
 		}
@@ -1125,12 +1228,13 @@ struct MIPS_Architecture
 			IF_Stage2(clockCycles);
 			IF_Stage1(PCcurr,clockCycles);
 			printRegisters(clockCycles);
-
+			std::cout<<pipeline_controls.count<<"   "<<PCcurr<<std::endl;
 			if(pipeline_controls.count == 9){
 				break;
 			}
+			std::cout<<pipeline_controls.IF_Stage_1<<pipeline_controls.IF_Stage_2<<pipeline_controls.ID_Stage_1 <<pipeline_controls.ID_Stage_2<<pipeline_controls.RR_<< pipeline_controls.ALU_Stage_<<pipeline_controls.MEM_Stage_1<<pipeline_controls.MEM_Stage_2<<pipeline_controls.WB_1<<std::endl;
 			}
-
+			
 		}
 
 
