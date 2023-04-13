@@ -1295,14 +1295,18 @@ int RR_Stage_bypass(int clockCycles){
 			if(_ID2_latch.operation != addimmediate){
 				if(t1 == registerMap[_ID2_latch.register_r3] || t1 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r3]){
 					return 0;
-				}else if(t3 == registerMap[_ID2_latch.register_r3] || t3 == registerMap[_ID2_latch.register_r2]){
-					_RR_latch.reg3_value = _E
+				}else if(t3 == registerMap[_ID2_latch.register_r3]){
+					_RR_latch.reg3_value = _EX_latch.data;
 
-				}else{
+				}else if(t4 == registerMap[_ID2_latch.register_r3] ){
+					_RR_latch.reg3_value = _MEM2_latch.data;
+
+				}
+				else{
 					_RR_latch.reg3_value = registers[registerMap[_ID2_latch.register_r3]];
 				}
 			}else{
-				if(t3 == registerMap[_ID2_latch.register_r2] || t1 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r2] ){
+				if(t1 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r2] ){
 					return 0;
 				}
 				_RR_latch.reg3_value = _ID2_latch.immediate;
@@ -1312,11 +1316,16 @@ int RR_Stage_bypass(int clockCycles){
 			_RR_latch.branch_instruction = false;
 			_RR_latch._stage7 =true;
 			_RR_latch.destination_register = _ID2_latch.register_r1;
-			_RR_latch.reg2_value = registers[registerMap[_ID2_latch.register_r2]];
-			
+			if(t3 == registerMap[_ID2_latch.register_r2]){
+				_RR_latch.reg2_value = _EX_latch.data;
+			}else if(t4 == registerMap[_ID2_latch.register_r2]){
+				_RR_latch.reg2_value = _MEM2_latch.data;
+			}else{
+				_RR_latch.reg2_value = registers[registerMap[_ID2_latch.register_r2]];
+			}			
 
 		}else if(_ID2_latch.branch_instruction){
-			if(t3 == registerMap[_ID2_latch.register_r3] || t3 == registerMap[_ID2_latch.register_r2] ||t1 == registerMap[_ID2_latch.register_r3] || t1 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r3]){
+			if(t1 == registerMap[_ID2_latch.register_r3] || t1 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r2] || t2 == registerMap[_ID2_latch.register_r3]){
 					return 0;
 				}
 			_RR_latch.label = _ID2_latch.label;
