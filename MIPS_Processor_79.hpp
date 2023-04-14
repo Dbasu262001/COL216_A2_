@@ -1058,17 +1058,16 @@ struct MIPS_Architecture
 		if(!pipeline_controls.ALU_Stage_){
 			return 0;
 		}
-		if(_RR_latch._stage7 == true && _RR_latch.branch_instruction == true){
+		if(_RR_latch._stage7){
+			if(pipeline_controls.WB_1 ==true){
+			return 0;
+			}else if(_RR_latch.branch_instruction == true){
 			exit_code ret = (exit_code)instructions_execute[_RR_latch.op](*this,_RR_latch.destination_register,_RR_latch.reg2_value,_RR_latch.reg3_value);
 			pipeline_controls.stage_7 = false;
 			pipeline_controls.ALU_Stage_ = false;
 			pipeline_controls.count = pipeline_controls.count+1;
 			return 0;
-		}
-		if(_RR_latch._stage7){
-			if(pipeline_controls.WB_1 ==true){
-			return 0;
-			}else{
+		}else{
 				exit_code ret = (exit_code)instructions_execute[_RR_latch.op](*this,_RR_latch.destination_register,_RR_latch.reg2_value,_RR_latch.reg3_value);
 				pipeline_controls.stage_7 =true;
 				pipeline_controls.WB_1 =true;
@@ -1262,6 +1261,7 @@ struct MIPS_Architecture
 			IF_Stage1(PCcurr,clockCycles);
 			printRegistersAndMemoryDelta(clockCycles);
 			if(pipeline_controls.count == 9){
+								std::cout<<clockCycles<<std::endl;
 				break;
 			}
 			}
@@ -1472,6 +1472,7 @@ int RR_Stage_bypass(int clockCycles){
 			IF_Stage1(PCcurr,clockCycles);
 			printRegistersAndMemoryDelta(clockCycles);
 			if(pipeline_controls.count == 9){
+				std::cout<<clockCycles<<std::endl;
 				break;
 			}
 		}
