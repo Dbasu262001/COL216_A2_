@@ -4,8 +4,8 @@
  * 
  */
 
-#ifndef __MIPS_PROCESSOR_HPP__
-#define __MIPS_PROCESSOR_HPP__
+#ifndef __MIPS_PROCESSOR_HPP_79__
+#define __MIPS_PROCESSOR_HPP_79__
 
 #include <unordered_map>
 #include <string>
@@ -870,7 +870,7 @@ struct MIPS_Architecture
 			}
 			++commandCount[PCcurr];
 			PCcurr = PCnext;
-			printRegisters(clockCycles);
+			printRegistersAndMemoryDelta(clockCycles);
 		}
 		handleExit(SUCCESS, clockCycles);
 	}
@@ -1260,9 +1260,8 @@ struct MIPS_Architecture
 			ID_Stage1(_IF2_latch.command,clockCycles);
 			IF_Stage2(clockCycles);
 			IF_Stage1(PCcurr,clockCycles);
-			printRegisters(clockCycles);
+			printRegistersAndMemoryDelta(clockCycles);
 			if(pipeline_controls.count == 9){
-				std::cout<<clockCycles<<std::endl;
 				break;
 			}
 			}
@@ -1471,9 +1470,8 @@ int RR_Stage_bypass(int clockCycles){
 			ID_Stage1(_IF2_latch.command,clockCycles);
 			IF_Stage2(clockCycles);
 			IF_Stage1(PCcurr,clockCycles);
-			printRegisters(clockCycles);
+			printRegistersAndMemoryDelta(clockCycles);
 			if(pipeline_controls.count == 9){
-				std::cout<<clockCycles<<std::endl;
 				break;
 			}
 		}
@@ -1482,17 +1480,17 @@ int RR_Stage_bypass(int clockCycles){
 
 
 	// print the register data in hexadecimal
-	void printRegisters(int clockCycle)
+	void printRegistersAndMemoryDelta(int clockCycle)
 	{
 		for (int i = 0; i < 32; ++i)
 			std::cout << registers[i] << ' ';
-		std::cout <<'\n';
+		std::cout << '\n';
 		std::cout << memoryDelta.size() << ' ';
 		if(memoryDelta.size()==0){
 			std::cout<<'\n';
 		}
 		for (auto &p : memoryDelta)
-			std::cout << p.first << ' ' << p.second <<'\n';
+			std::cout << p.first << ' ' << p.second << '\n';
 		memoryDelta.clear();
 	}
 };
